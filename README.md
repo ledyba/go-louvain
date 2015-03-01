@@ -10,7 +10,7 @@ Implementation of [Louvian method](https://perso.uclouvain.be/vincent.blondel/re
 
 # Reference
 
-Fast unfolding of communities in large networks, 
+Fast unfolding of communities in large networks,   
 Vincent D Blondel, Jean-Loup Guillaume, Renaud Lambiotte, Etienne Lefebvre,   
 Journal of Statistical Mechanics: Theory and Experiment 2008 (10), P10008 (12pp)  
 doi: [10.1088/1742-5468/2008/10/P10008](http://dx.doi.org/10.1088%2F1742-5468%2F2008%2F10%2FP10008). ArXiv: [http://arxiv.org/abs/0803.0476](http://arxiv.org/abs/0803.0476)
