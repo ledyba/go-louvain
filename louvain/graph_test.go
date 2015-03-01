@@ -9,7 +9,7 @@ func TestIsolated(t *testing.T) {
 	tot := 0
 	for i := range nodes {
 		node := &nodes[i]
-		node.Degree = 0
+		node.Degree = 1
 		node.SelfLoop = 1
 		tot++
 	}
