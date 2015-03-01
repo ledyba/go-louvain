@@ -8,6 +8,7 @@ type Link struct {
 	Weight int
 	To     *Node
 }
+type Comparable func(c1 interface{}, c2 interface{}) bool
 type Node struct {
 	Data     interface{}
 	Parent   *Node
@@ -21,10 +22,11 @@ type Node struct {
 type Graph struct {
 	Total int
 	Nodes []Node
+	comp  Comparable
 }
 
-func MakeNewGraph(total int, nodes []Node) *Graph {
-	return &Graph{total, nodes}
+func MakeNewGraph(total int, nodes []Node, compFn Comparable) *Graph {
+	return &Graph{total, nodes, compFn}
 }
 
 func shuffleOrder(size int) []int {
@@ -39,7 +41,7 @@ func shuffleOrder(size int) []int {
 	return array
 }
 
-func (g *Graph) NextLevel() *Graph {
+func (g *Graph) NextLevel(limit int) *Graph {
 	commTotal := make([]int, len(g.Nodes))
 	commIn := make([]int, len(g.Nodes))
 	for i := range g.Nodes {
@@ -51,19 +53,21 @@ func (g *Graph) NextLevel() *Graph {
 	order := shuffleOrder(len(g.Nodes))
 	neighLinks := make([]int, len(g.Nodes))
 	neighComm := make([]int, 0, len(g.Nodes))
-	changed := 1
-	for changed > len(g.Nodes)/100 {
+	changed := len(g.Nodes)
+	cnt := 0
+	for changed > len(g.Nodes)/100 && (limit <= 0 || cnt < limit){
 		changed = 0
+		cnt++
 		for _, rpos := range order {
-			node := g.Nodes[rpos]
+			node := &g.Nodes[rpos]
 			/* Calculating Neighbor Communities */
 			for _, comm := range neighComm {
-				neighLinks[comm] = -1
+				neighLinks[comm] = 0
 			}
 			neighComm = neighComm[0:0]
 			for _, link := range node.Links {
 				to := link.To.tmpComm
-				if neighLinks[to] < 0 {
+				if neighLinks[to] <= 0 {
 					neighComm = append(neighComm, to)
 					neighLinks[to] = link.Weight
 				} else {
@@ -77,14 +81,14 @@ func (g *Graph) NextLevel() *Graph {
 			best_comm := node.tmpComm
 			best_gain := float32(0.0)
 			for _, comm := range neighComm {
-				gain := float32(neighLinks[node.tmpComm]) - float32(commTotal[node.tmpComm]*node.Degree)/float32(g.Total)
+				gain := float32(neighLinks[comm]) - float32(commTotal[comm]*node.Degree)/float32(g.Total)
 				if gain > best_gain {
 					best_comm = comm
 					best_gain = gain
 				}
 			}
 			/* Insert to the best community */
-			if node.tmpComm != best_comm{
+			if node.tmpComm != best_comm {
 				changed++
 			}
 			node.tmpComm = best_comm
@@ -92,7 +96,7 @@ func (g *Graph) NextLevel() *Graph {
 			commIn[node.tmpComm] += 2*neighLinks[node.tmpComm] + node.SelfLoop
 		}
 	}
-	
+
 	//Calc Next nodes:
 	communities := make([]Node, 0, len(g.Nodes)/2)
 	c2i := make([]int, len(g.Nodes))
@@ -101,23 +105,26 @@ func (g *Graph) NextLevel() *Graph {
 		c := c2i[node.tmpComm]
 		var comm *Node
 		if c <= 0 {
-			c2i[node.tmpComm] = len(communities)+1
+			c2i[node.tmpComm] = len(communities) + 1
 			communities = append(communities, Node{})
 			comm = &communities[len(communities)-1]
 			comm.Child = make([]*Node, 0)
 			comm.Links = make([]Link, 0)
 			comm.tmpComm = node.tmpComm
-		}else{
+		} else {
 			comm = &communities[c-1]
 		}
 		comm.Child = append(comm.Child, node)
+		if comm.Data == nil || g.comp(comm.Data /* < */, node.Data) {
+			comm.Data = node.Data
+		}
 	}
 	for i := range communities {
 		comm := &communities[i]
-		for _,child := range comm.Child {
+		for _, child := range comm.Child {
 			child.Parent = comm
 			comm.SelfLoop += child.SelfLoop
-			for _,link := range child.Links {
+			for _, link := range child.Links {
 				if link.To.tmpComm == comm.tmpComm {
 					comm.SelfLoop += link.Weight
 				} else {
@@ -131,7 +138,7 @@ func (g *Graph) NextLevel() *Graph {
 					}
 					if !found {
 						linked := &communities[c2i[lcomm]-1]
-						comLink := Link {link.Weight, linked}
+						comLink := Link{link.Weight, linked}
 						comm.Links = append(comm.Links, comLink)
 					}
 				}
@@ -139,5 +146,5 @@ func (g *Graph) NextLevel() *Graph {
 		}
 	}
 
-	return &Graph{g.Total, communities}
+	return &Graph{g.Total, communities, g.comp}
 }
