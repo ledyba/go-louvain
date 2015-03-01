@@ -5,15 +5,10 @@ import (
 )
 
 func TestIsolated(t *testing.T) {
-	nodes := make([]Node, 10)
-	tot := 0
-	for i := range nodes {
-		node := &nodes[i]
-		node.Degree = 1
-		node.SelfLoop = 1
-		tot++
+	g := MakeNewGraph(100, func(a,b interface{})bool{return true})
+	for i:=0;i<100;i++{
+		g.Connect(i,i,1)
 	}
-	g := MakeNewGraph(tot, nodes, func(a,b interface{})bool{return true})
 	g2 := g.NextLevel(-1)
 	if g2.Total != g.Total {
 		t.Fatalf("Total not matched: %v != %v", g.Total, g2.Total)
@@ -32,24 +27,11 @@ func TestIsolated(t *testing.T) {
 	}
 }
 func TestConnected(t *testing.T) {
-	nodes := make([]Node, 100)
-	tot := 0
-	for i := range nodes {
-		node := &nodes[i]
-		node.SelfLoop = 0
-		node.Links = []Link{}
+	g := MakeNewGraph(100, func(a,b interface{})bool{return true})
+	for i := range g.Nodes {
 		mod := i%10
-		if mod > 0{
-			p := &nodes[i-mod]
-			p.Degree+=10
-			tot+=10
-			node.Degree+=10
-			tot+=10
-			node.Links = append(node.Links, Link{10,p})
-			p.Links = append(p.Links, Link{10,node})
-		}
+		g.Connect(i,i-mod, 10)
 	}
-	g := MakeNewGraph(tot, nodes, func(a,b interface{})bool{return true})
 	g2 := g.NextLevel(-1)
 	if g2.Total != g.Total {
 		t.Fatalf("Total not matched: %v != %v", g.Total, g2.Total)

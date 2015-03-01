@@ -22,12 +22,24 @@ type Node struct {
 type Graph struct {
 	Total int
 	Nodes []Node
-	comp  Comparable
+	compFn  Comparable
 }
 
-func MakeNewGraph(total int, nodes []Node, compFn Comparable) *Graph {
-	return &Graph{total, nodes, compFn}
+func MakeNewGraph(size int, dataCompFn Comparable) *Graph {
+	nodes := make([]Node, size)
+	return &Graph{0, nodes, dataCompFn}
 }
+
+func (g *Graph) Connect(i,j,w int) {
+	if i == j {
+		g.Nodes[i].SelfLoop += w*2
+	}else{
+		g.Nodes[i].Links = append(g.Nodes[i].Links, Link{w, &g.Nodes[j]})
+		g.Nodes[j].Links = append(g.Nodes[j].Links, Link{w, &g.Nodes[i]})
+	}
+	g.Total += w*2
+}
+
 
 func shuffleOrder(size int) []int {
 	array := make([]int, size)
@@ -115,7 +127,7 @@ func (g *Graph) NextLevel(limit int) *Graph {
 			comm = &communities[c-1]
 		}
 		comm.Child = append(comm.Child, node)
-		if comm.Data == nil || g.comp(comm.Data /* < */, node.Data) {
+		if comm.Data == nil || g.compFn(comm.Data /* < */, node.Data) {
 			comm.Data = node.Data
 		}
 	}
@@ -146,5 +158,5 @@ func (g *Graph) NextLevel(limit int) *Graph {
 		}
 	}
 
-	return &Graph{g.Total, communities, g.comp}
+	return &Graph{g.Total, communities, g.compFn}
 }
