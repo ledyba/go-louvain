@@ -1,6 +1,6 @@
 # The Louvain method for community detection in large networks
 
-Implementation of [Louvian method](https://perso.uclouvain.be/vincent.blondel/research/louvain.html) in golang.
+Implementation of [Louvain method](https://perso.uclouvain.be/vincent.blondel/research/louvain.html) in golang.
 
 # How to
 
