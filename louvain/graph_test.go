@@ -5,7 +5,7 @@ import (
 )
 
 func TestIsolated(t *testing.T) {
-	g := MakeNewGraph(100, func(a,b interface{})bool{return true})
+	g := MakeNewGraph(100, MergeFn(func(a []*Node) interface{}{return true}))
 	for i:=0;i<100;i++{
 		g.Connect(i,i,1)
 	}
@@ -27,7 +27,7 @@ func TestIsolated(t *testing.T) {
 	}
 }
 func TestConnected(t *testing.T) {
-	g := MakeNewGraph(100, func(a,b interface{})bool{return true})
+	g := MakeNewGraph(100, MergeFn(func(a []*Node) interface{}{return true}))
 	for i := range g.Nodes {
 		mod := i%10
 		g.Connect(i,i-mod, 10)
