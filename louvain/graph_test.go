@@ -9,7 +9,7 @@ func TestIsolated(t *testing.T) {
 	for i:=0;i<100;i++{
 		g.Connect(i,i,1)
 	}
-	g2 := g.NextLevel(-1)
+	g2 := g.NextLevel(-1,0)
 	if g2.Total != g.Total {
 		t.Fatalf("Total not matched: %v != %v", g.Total, g2.Total)
 	}
@@ -32,7 +32,7 @@ func TestConnected(t *testing.T) {
 		mod := i%10
 		g.Connect(i,i-mod, 10)
 	}
-	g2 := g.NextLevel(-1)
+	g2 := g.NextLevel(-1,0)
 	if g2.Total != g.Total {
 		t.Fatalf("Total not matched: %v != %v", g.Total, g2.Total)
 	}

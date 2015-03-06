@@ -1,6 +1,7 @@
 package louvain
 
 import (
+	"log"
 	"math/rand"
 )
 
@@ -27,6 +28,9 @@ type Graph struct {
 func MakeNewGraph(size int, mergeFn MergeFn) *Graph {
 	nodes := make([]Node, size)
 	return &Graph{0, nodes, mergeFn}
+}
+func MakeNewGraphFromNodes(nodes []Node, totalLinks int, mergeFn MergeFn) *Graph {
+	return &Graph{totalLinks, nodes, mergeFn}
 }
 
 func (g *Graph) Connect(i,j,w int) {
@@ -58,7 +62,7 @@ func shuffleOrder(size int) []int {
 	return array
 }
 
-func (g *Graph) NextLevel(limit int) *Graph {
+func (g *Graph) NextLevel(limit int, precision float32) *Graph {
 	commTotal := make([]int, len(g.Nodes))
 	commIn := make([]int, len(g.Nodes))
 	tmpComm := make([]int, len(g.Nodes))
@@ -73,7 +77,11 @@ func (g *Graph) NextLevel(limit int) *Graph {
 	neighComm := make([]int, 0, len(g.Nodes))
 	changed := len(g.Nodes)
 	cnt := 0
-	for changed > len(g.Nodes)/100 && (limit <= 0 || cnt < limit){
+	for changed > len(g.Nodes)/100{
+		if limit > 0 && cnt >= limit {
+			log.Printf("Exceed limit");
+			break
+		}
 		changed = 0
 		cnt++
 		for _, rpos := range order {
@@ -98,7 +106,7 @@ func (g *Graph) NextLevel(limit int) *Graph {
 			commIn[nodeTmpComm] -= 2*neighLinks[nodeTmpComm] + node.SelfLoop
 			/* Calculating the BEST community */
 			best_comm := nodeTmpComm
-			best_gain := float32(0.0)
+			best_gain := precision
 			for _, comm := range neighComm {
 				gain := float32(neighLinks[comm]) - float32(commTotal[comm]*node.Degree)/float32(g.Total)
 				if gain > best_gain {
@@ -145,8 +153,10 @@ func (g *Graph) NextLevel(limit int) *Graph {
 		for _, child := range comm.Child {
 			child.Parent = comm
 			comm.SelfLoop += child.SelfLoop
+			comm.Degree += child.SelfLoop
 			for linkToIdx,weight := range child.Links {
 				cLinkToCommNow := tmpComm[linkToIdx]
+				comm.Degree += weight
 				if cLinkToCommNow == oldComm {
 					comm.SelfLoop += weight
 				} else {
