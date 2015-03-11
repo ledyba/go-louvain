@@ -5,10 +5,6 @@ import (
 	"math/rand"
 )
 
-type Link struct {
-	Weight int
-	To     *Node
-}
 type MergeFn func(cs []*Node) interface{}
 type Node struct {
 	Data     interface{}
@@ -20,9 +16,9 @@ type Node struct {
 }
 
 type Graph struct {
-	Total int
-	Nodes []Node
-	mergeFn  MergeFn
+	Total   int
+	Nodes   []Node
+	mergeFn MergeFn
 }
 
 func MakeNewGraph(size int, mergeFn MergeFn) *Graph {
@@ -33,33 +29,20 @@ func MakeNewGraphFromNodes(nodes []Node, totalLinks int, mergeFn MergeFn) *Graph
 	return &Graph{totalLinks, nodes, mergeFn}
 }
 
-func (g *Graph) Connect(i,j,w int) {
+func (g *Graph) Connect(i, j, w int) {
 	if i == j {
-		g.Nodes[i].SelfLoop += w*2
-	}else{
-		if g.Nodes[i].Links == nil{
+		g.Nodes[i].SelfLoop += w * 2
+	} else {
+		if g.Nodes[i].Links == nil {
 			g.Nodes[i].Links = make(map[int]int)
 		}
-		if g.Nodes[j].Links == nil{
+		if g.Nodes[j].Links == nil {
 			g.Nodes[j].Links = make(map[int]int)
 		}
-		g.Nodes[i].Links[j]+=w
-		g.Nodes[j].Links[i]+=w
+		g.Nodes[i].Links[j] += w
+		g.Nodes[j].Links[i] += w
 	}
-	g.Total += w*2
-}
-
-
-func shuffleOrder(size int) []int {
-	array := make([]int, size)
-	for i := range array {
-		array[i] = i
-	}
-	for i := 0; i < size-1; i++ {
-		rpos := rand.Intn(size-i) + 1
-		array[i], array[rpos] = array[rpos], array[i]
-	}
-	return array
+	g.Total += w * 2
 }
 
 func (g *Graph) NextLevel(limit int, precision float32) *Graph {
@@ -72,14 +55,14 @@ func (g *Graph) NextLevel(limit int, precision float32) *Graph {
 		commTotal[i] = node.Degree
 		commIn[i] = node.SelfLoop
 	}
-	order := shuffleOrder(len(g.Nodes))
+	order := rand.Perm(len(g.Nodes))
 	neighLinks := make([]int, len(g.Nodes))
 	neighComm := make([]int, 0, len(g.Nodes))
 	changed := len(g.Nodes)
 	cnt := 0
-	for changed > len(g.Nodes)/100{
+	for changed > len(g.Nodes)/100 {
 		if limit > 0 && cnt >= limit {
-			log.Printf("Exceed limit");
+			log.Printf("Exceed limit")
 			break
 		}
 		changed = 0
@@ -92,7 +75,7 @@ func (g *Graph) NextLevel(limit int, precision float32) *Graph {
 				neighLinks[comm] = 0
 			}
 			neighComm = neighComm[0:0]
-			for linkToIdx,weight := range node.Links {
+			for linkToIdx, weight := range node.Links {
 				to := tmpComm[linkToIdx]
 				if neighLinks[to] <= 0 {
 					neighComm = append(neighComm, to)
@@ -154,13 +137,13 @@ func (g *Graph) NextLevel(limit int, precision float32) *Graph {
 			child.Parent = comm
 			comm.SelfLoop += child.SelfLoop
 			comm.Degree += child.SelfLoop
-			for linkToIdx,weight := range child.Links {
+			for linkToIdx, weight := range child.Links {
 				cLinkToCommNow := tmpComm[linkToIdx]
 				comm.Degree += weight
 				if cLinkToCommNow == oldComm {
 					comm.SelfLoop += weight
 				} else {
-					comm.Links[c2i[cLinkToCommNow]-1]+=weight
+					comm.Links[c2i[cLinkToCommNow]-1] += weight
 				}
 			}
 		}
