@@ -5,12 +5,16 @@ import (
 	"math/rand"
 )
 
+type Link struct {
+	To     int
+	Weight int
+}
 type MergeFn func(cs []*Node) interface{}
 type Node struct {
 	Data     interface{}
 	Parent   *Node
-	Child    []*Node
-	Links    map[int]int
+	Children []*Node
+	Links    []Link
 	Degree   int
 	SelfLoop int
 }
@@ -29,23 +33,26 @@ func MakeNewGraphFromNodes(nodes []Node, totalLinks int, mergeFn MergeFn) *Graph
 	return &Graph{totalLinks, nodes, mergeFn}
 }
 
-func (g *Graph) Connect(i, j, w int) {
-	if i == j {
-		g.Nodes[i].SelfLoop += w * 2
-	} else {
-		if g.Nodes[i].Links == nil {
-			g.Nodes[i].Links = make(map[int]int)
-		}
-		if g.Nodes[j].Links == nil {
-			g.Nodes[j].Links = make(map[int]int)
-		}
-		g.Nodes[i].Links[j] += w
-		g.Nodes[j].Links[i] += w
+func (node *Node) Print() {
+	log.Printf("  Children: %v nodes", len(node.Children))
+	log.Printf("  Self loop: %d/%d", node.SelfLoop, node.Degree)
+	for to, weight := range node.Links {
+		log.Printf("  -> %d: %d/%d", to, weight, node.Degree)
 	}
-	g.Total += w * 2
+	log.Printf("  Payload: %v", node.Data)
+}
+
+func (g *Graph) Print() {
+	log.Printf("TotalLinks: %v", g.Total)
+	for i := range g.Nodes {
+		node := &g.Nodes[i]
+		log.Printf("<<Node %d>>", i)
+		node.Print()
+	}
 }
 
 func (g *Graph) NextLevel(limit int, precision float32) *Graph {
+	gTotal := float32(g.Total)
 	commTotal := make([]int, len(g.Nodes))
 	commIn := make([]int, len(g.Nodes))
 	tmpComm := make([]int, len(g.Nodes))
@@ -70,40 +77,48 @@ func (g *Graph) NextLevel(limit int, precision float32) *Graph {
 		for _, rpos := range order {
 			node := &g.Nodes[rpos]
 			nodeTmpComm := tmpComm[rpos]
+			nodeDegree := node.Degree
+			nodeSelfLoop := node.SelfLoop
 			/* Calculating Neighbor Communities */
 			for _, comm := range neighComm {
 				neighLinks[comm] = 0
 			}
 			neighComm = neighComm[0:0]
-			for linkToIdx, weight := range node.Links {
-				to := tmpComm[linkToIdx]
+			for _, link := range node.Links {
+				to := tmpComm[link.To]
 				if neighLinks[to] <= 0 {
 					neighComm = append(neighComm, to)
-					neighLinks[to] = weight
+					neighLinks[to] = link.Weight
 				} else {
-					neighLinks[to] += weight
+					neighLinks[to] += link.Weight
 				}
 			}
-			/* Remove from the original community */
-			commTotal[nodeTmpComm] -= node.Degree
-			commIn[nodeTmpComm] -= 2*neighLinks[nodeTmpComm] + node.SelfLoop
 			/* Calculating the BEST community */
-			best_comm := nodeTmpComm
-			best_gain := precision
+			bestComm := nodeTmpComm
+			bestGain := precision
 			for _, comm := range neighComm {
-				gain := float32(neighLinks[comm]) - float32(commTotal[comm]*node.Degree)/float32(g.Total)
-				if gain > best_gain {
-					best_comm = comm
-					best_gain = gain
+				var gain float32
+				if comm == nodeTmpComm {
+					gain = float32(neighLinks[comm]) - float32((commTotal[comm]-nodeDegree))*float32(nodeDegree)/gTotal
+				} else {
+					gain = float32(neighLinks[comm]) - float32(commTotal[comm])*float32(nodeDegree)/gTotal
+				}
+				if gain > bestGain {
+					bestGain = gain
+					bestComm = comm
 				}
 			}
 			/* Insert to the best community */
-			if nodeTmpComm != best_comm {
+			if nodeTmpComm != bestComm {
 				changed++
+				tmpComm[rpos] = bestComm
+				/* Remove from the original community */
+				commTotal[nodeTmpComm] -= nodeDegree
+				commIn[nodeTmpComm] -= 2*neighLinks[nodeTmpComm] + nodeSelfLoop
+				/* insert */
+				commTotal[bestComm] += nodeDegree
+				commIn[bestComm] += 2*neighLinks[bestComm] + nodeSelfLoop
 			}
-			tmpComm[rpos] = best_comm
-			commTotal[best_comm] += node.Degree
-			commIn[best_comm] += 2*neighLinks[best_comm] + node.SelfLoop
 		}
 	}
 
@@ -111,6 +126,7 @@ func (g *Graph) NextLevel(limit int, precision float32) *Graph {
 	communities := make([]Node, 0, len(g.Nodes)/2)
 	oldCommIdx := make([]int, 0, len(g.Nodes)/2)
 	c2i := make([]int, len(g.Nodes))
+	links := make([]map[int]int, 0)
 	for i := range g.Nodes {
 		node := &g.Nodes[i]
 		nodeTmpComm := tmpComm[i]
@@ -118,36 +134,52 @@ func (g *Graph) NextLevel(limit int, precision float32) *Graph {
 		var comm *Node
 		if c <= 0 {
 			c2i[nodeTmpComm] = len(communities) + 1
-			communities = append(communities, Node{})
+			communities = append(communities, Node{
+				Children: make([]*Node, 0),
+			})
 			oldCommIdx = append(oldCommIdx, nodeTmpComm)
+			links = append(links, nil)
 			comm = &communities[len(communities)-1]
-			comm.Child = make([]*Node, 0)
-			comm.Links = make(map[int]int)
 		} else {
 			comm = &communities[c-1]
 		}
-		comm.Child = append(comm.Child, node)
+		comm.Children = append(comm.Children, node)
 	}
 	// Merging edges
 	for i := range communities {
 		comm := &communities[i]
 		oldComm := oldCommIdx[i]
-		comm.Data = g.mergeFn(comm.Child)
-		for _, child := range comm.Child {
+		comm.Data = g.mergeFn(comm.Children)
+		link := links[i]
+		if link == nil {
+			link = make(map[int]int)
+			links[i] = link
+		}
+		for _, child := range comm.Children {
 			child.Parent = comm
 			comm.SelfLoop += child.SelfLoop
 			comm.Degree += child.SelfLoop
-			for linkToIdx, weight := range child.Links {
-				cLinkToCommNow := tmpComm[linkToIdx]
-				comm.Degree += weight
+			for _, edge := range child.Links {
+				cLinkToCommNow := tmpComm[edge.To]
+				comm.Degree += edge.Weight
 				if cLinkToCommNow == oldComm {
-					comm.SelfLoop += weight
+					comm.SelfLoop += edge.Weight
 				} else {
-					comm.Links[c2i[cLinkToCommNow]-1] += weight
+					link[c2i[cLinkToCommNow]-1] += edge.Weight
 				}
 			}
 		}
 	}
-
+	for i := range links {
+		comm := &communities[i]
+		comm.Links = make([]Link, 0, len(links[i]))
+		link := links[i]
+		if link == nil {
+			continue
+		}
+		for to, weight := range link {
+			comm.Links = append(comm.Links, Link{to, weight})
+		}
+	}
 	return &Graph{g.Total, communities, g.mergeFn}
 }
